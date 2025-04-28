@@ -83,79 +83,79 @@ with tab1:
             st.warning("Tidak ada data yang berhasil digabungkan.")
 
     # ------------------ Upload File Traffic Analytic ------------------
-st.divider()
-st.subheader("📥 Upload File Traffic Analytic")
+    st.divider()
+    st.subheader("📥 Upload File Traffic Analytic")
 
-file_traffic = st.file_uploader(
-    "Upload file Excel untuk Traffic Analytic (Weekly)",
-    type=["xlsx"], key="traffic_upload"
-)
+    file_traffic = st.file_uploader(
+        "Upload file Excel untuk Traffic Analytic (Weekly)",
+        type=["xlsx"], key="traffic_upload"
+    )
 
-if file_traffic:
-    try:
-        traffic_raw_df = pd.read_excel(file_traffic, sheet_name="Traffic Analytic", header=None)
+    if file_traffic:
+        try:
+            traffic_raw_df = pd.read_excel(file_traffic, sheet_name="Traffic Analytic", header=None)
 
-        tanggal = None
-        extracted_data = []
+            tanggal = None
+            extracted_data = []
 
-        for index, row in traffic_raw_df.iterrows():
-            row_data = row.dropna().tolist()
+            for index, row in traffic_raw_df.iterrows():
+                row_data = row.dropna().tolist()
 
-            if any(isinstance(cell, str) and "-" in cell for cell in row_data):
-                tanggal = row_data[0]
+                if any(isinstance(cell, str) and "-" in cell for cell in row_data):
+                    tanggal = row_data[0]
 
-            if len(row_data) >= 5 and isinstance(row_data[2], str) and row_data[2].startswith('RTR'):
-                entry = {
-                    'Tanggal': traffic_raw_df.iloc[index, 2],
-                    'Cabang': traffic_raw_df.iloc[index, 3],
-                }
-                extracted_data.append(entry)
+                if len(row_data) >= 5 and isinstance(row_data[2], str) and row_data[2].startswith('RTR'):
+                    entry = {
+                        'Tanggal': traffic_raw_df.iloc[index, 2],
+                        'Cabang': traffic_raw_df.iloc[index, 3],
+                    }
+                    extracted_data.append(entry)
 
-        if extracted_data:
-            selected_traffic = pd.DataFrame(extracted_data)
-            selected_traffic['Tanggal'] = pd.to_datetime(selected_traffic['Tanggal'], dayfirst=True, errors='coerce')
+            if extracted_data:
+                selected_traffic = pd.DataFrame(extracted_data)
+                selected_traffic['Tanggal'] = pd.to_datetime(selected_traffic['Tanggal'], dayfirst=True, errors='coerce')
 
-            # ------------------ Tambahan Filter Range Tanggal ------------------
-            st.subheader("📅 Pilih Rentang Tanggal")
-            min_date = selected_traffic['Tanggal'].min()
-            max_date = selected_traffic['Tanggal'].max()
+                # ------------------ Tambahan Filter Range Tanggal ------------------
+                st.subheader("📅 Pilih Rentang Tanggal")
+                min_date = selected_traffic['Tanggal'].min()
+                max_date = selected_traffic['Tanggal'].max()
 
-            start_date, end_date = st.date_input(
-                "Pilih rentang tanggal:",
-                value=(min_date, max_date),
-                min_value=min_date,
-                max_value=max_date
-            )
+                start_date, end_date = st.date_input(
+                    "Pilih rentang tanggal:",
+                    value=(min_date, max_date),
+                    min_value=min_date,
+                    max_value=max_date
+                )
 
-            mask = (selected_traffic['Tanggal'] >= pd.to_datetime(start_date)) & (selected_traffic['Tanggal'] <= pd.to_datetime(end_date))
-            filtered_traffic = selected_traffic.loc[mask]
+                mask = (selected_traffic['Tanggal'] >= pd.to_datetime(start_date)) & (selected_traffic['Tanggal'] <= pd.to_datetime(end_date))
+                filtered_traffic = selected_traffic.loc[mask]
 
-            st.subheader("📄 Data Traffic Analytic (Kolom: Tanggal dan Cabang - Sesuai Range Tanggal)")
-            st.dataframe(filtered_traffic, use_container_width=True)
+                st.subheader("📄 Data Traffic Analytic (Kolom: Tanggal dan Cabang - Sesuai Range Tanggal)")
+                st.dataframe(filtered_traffic, use_container_width=True)
 
-            # ------------------ Tambahan: Rekap Cabang dan Jumlah Kemunculannya ------------------
-            if not filtered_traffic.empty:
-                st.subheader("🏢 Gabungan Daftar Cabang, Jumlah Kemunculan, dan Average Utilization")
+                # ------------------ Tambahan: Rekap Cabang dan Jumlah Kemunculannya ------------------
+                if not filtered_traffic.empty:
+                    st.subheader("🏢 Gabungan Daftar Cabang, Jumlah Kemunculan, dan Average Utilization")
 
-                # Hitung jumlah munculnya cabang
-                cabang_count = filtered_traffic['Cabang'].value_counts().reset_index()
-                cabang_count.columns = ['Cabang', 'Jumlah Muncul']
+                    # Hitung jumlah munculnya cabang
+                    cabang_count = filtered_traffic['Cabang'].value_counts().reset_index()
+                    cabang_count.columns = ['Cabang', 'Jumlah Muncul']
 
-                # Gabungkan dengan pivot_df (average utilization)
-                if structured_df is not None:
-                    # Sesuaikan nama kolom supaya bisa merge
-                    structured_df.rename(columns={"Device Name": "Cabang"}, inplace=True)
-                    merged_df = pd.merge(cabang_count, structured_df, on='Cabang', how='left')
+                    # Gabungkan dengan pivot_df (average utilization)
+                    if structured_df is not None:
+                        # Sesuaikan nama kolom supaya bisa merge
+                        structured_df.rename(columns={"Device Name": "Cabang"}, inplace=True)
+                        merged_df = pd.merge(cabang_count, structured_df, on='Cabang', how='left')
 
-                    st.dataframe(merged_df, use_container_width=True)
+                        st.dataframe(merged_df, use_container_width=True)
+                    else:
+                        st.warning("❗ Data Advanced Report belum tersedia untuk digabungkan.")
                 else:
-                    st.warning("❗ Data Advanced Report belum tersedia untuk digabungkan.")
+                    st.info("Tidak ada data dalam rentang tanggal yang dipilih.")
             else:
-                st.info("Tidak ada data dalam rentang tanggal yang dipilih.")
-        else:
-            st.warning("Tidak ada data yang bisa diekstrak dari file Traffic Analytic.")
-    except Exception as e:
-        st.error(f"❌ Gagal memproses file Traffic Analytic: {str(e)}")
+                st.warning("Tidak ada data yang bisa diekstrak dari file Traffic Analytic.")
+        except Exception as e:
+            st.error(f"❌ Gagal memproses file Traffic Analytic: {str(e)}")
 
 # -------------------------- TAB MONTHLY --------------------------
 with tab2:
