@@ -265,5 +265,20 @@ with tab2:
             structured_df = pd.DataFrame(structured_data)
             st.dataframe(structured_df, use_container_width=True)
 
+            # Export structured_df ke file Excel
+            output_structured = io.BytesIO()
+            with pd.ExcelWriter(output_structured, engine='xlsxwriter') as writer:
+                structured_df.to_excel(writer, index=False, sheet_name='Structured Pivot')
+                writer.save()
+                processed_structured_data = output_structured.getvalue()
+
+            # Tombol download
+            st.download_button(
+                label="📥 Download Pivot Table (Device → Interface) (.xlsx)",
+                data=processed_structured_data,
+                file_name='pivot_table_device_interface.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
         else:
             st.warning("Tidak ada data yang berhasil digabungkan.")
