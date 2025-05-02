@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import io
 
 st.set_page_config(page_title="Report Dashboard", layout="wide")
 st.title("📈 Dashboard Report")
@@ -135,21 +136,58 @@ with tab1:
 
                 # ------------------ Tambahan: Rekap Cabang dan Jumlah Kemunculannya ------------------
                 if not filtered_traffic.empty:
-                    st.subheader("🏢 Gabungan Daftar Cabang, Jumlah Kemunculan, dan Average Utilization")
+                    st.subheader("🏢 Gabungan Daftar Cabang, Jumlah Traffic Tinggi, dan Average Utilization per Provider")
 
                     # Hitung jumlah munculnya cabang
                     cabang_count = filtered_traffic['Cabang'].value_counts().reset_index()
-                    cabang_count.columns = ['Cabang', 'Jumlah Muncul']
+                    cabang_count.columns = ['Cabang', 'Jumlah Traffic Tinggi']
 
-                    # Gabungkan dengan pivot_df (average utilization)
-                    if structured_df is not None:
-                        # Sesuaikan nama kolom supaya bisa merge
-                        structured_df.rename(columns={"Device Name": "Cabang"}, inplace=True)
-                        merged_df = pd.merge(cabang_count, structured_df, on='Cabang', how='left')
+                    if 'pivot_df_reset' in locals():
+                        # Filter berdasarkan nama interface masing-masing provider
+                        telkom_df = pivot_df_reset[pivot_df_reset['Interface Name'] == "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="]
+                        lintasarta_df = pivot_df_reset[pivot_df_reset['Interface Name'] == "GigabitEthernet0/0/1-= WAN INTERNET LA ="]
+
+                        # Ubah nama kolom Device Name menjadi Cabang
+                        telkom_df = telkom_df.rename(columns={"Device Name": "Cabang", "Total Utilization(%)": "Util % 1"})
+                        lintasarta_df = lintasarta_df.rename(columns={"Device Name": "Cabang", "Total Utilization(%)": "Util % 2"})
+
+                        # Ambil hanya kolom yang diperlukan
+                        telkom_df = telkom_df[["Cabang", "Util % 1"]]
+                        lintasarta_df = lintasarta_df[["Cabang", "Util % 2"]]
+
+                        # Bulatkan ke dua angka di belakang koma
+                        telkom_df["Util % 1"] = telkom_df["Util % 1"].round(2)
+                        lintasarta_df["Util % 2"] = lintasarta_df["Util % 2"].round(2)
+
+                        # Gabungkan semua data
+                        merged_df = cabang_count.merge(telkom_df, on='Cabang', how='left')
+                        merged_df = merged_df.merge(lintasarta_df, on='Cabang', how='left')
+
+                        # Tambahkan nama provider
+                        merged_df["Provider 1"] = "Telkom"
+                        merged_df["Provider 2"] = "Lintasarta"
+
+                        # Susun ulang kolom
+                        merged_df = merged_df[["Cabang", "Jumlah Traffic Tinggi", "Provider 1", "Util % 1", "Provider 2", "Util % 2"]]
 
                         st.dataframe(merged_df, use_container_width=True)
+
+                        # Export ke file Excel
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            merged_df.to_excel(writer, index=False, sheet_name='Rekap Traffic')
+                            writer.save()
+                            processed_data = output.getvalue()
+
+                        # Tombol download
+                        st.download_button(
+                            label="📥 Download Rekap Cabang (.xlsx)",
+                            data=processed_data,
+                            file_name='rekap_cabang_traffic.xlsx',
+                            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        )
                     else:
-                        st.warning("❗ Data Advanced Report belum tersedia untuk digabungkan.")
+                        st.warning("❗ Data Pivot Table belum tersedia untuk digabungkan.")
                 else:
                     st.info("Tidak ada data dalam rentang tanggal yang dipilih.")
             else:
