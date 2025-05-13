@@ -156,8 +156,8 @@ with tab1:
                         lintasarta_df = lintasarta_df[["Cabang", "Util % 2"]]
 
                         # Bulatkan ke dua angka di belakang koma
-                        telkom_df["Util % 1"] = telkom_df["Util % 1"].round(2)
-                        lintasarta_df["Util % 2"] = lintasarta_df["Util % 2"].round(2)
+                        telkom_df["Util % 1"] = telkom_df["Util % 1"].round(2).astype(str) + "%"
+                        lintasarta_df["Util % 2"] = lintasarta_df["Util % 2"].round(2).astype(str) + "%"
 
                         # Gabungkan semua data
                         merged_df = cabang_count.merge(telkom_df, on='Cabang', how='left')
@@ -174,15 +174,14 @@ with tab1:
 
                         # Export ke file Excel
                         output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
                             merged_df.to_excel(writer, index=False, sheet_name='Rekap Traffic')
-                            writer.save()
-                            processed_data = output.getvalue()
+                        output.seek(0)  # Penting agar file tidak corrupt
 
                         # Tombol download
                         st.download_button(
                             label="📥 Download Rekap Cabang (.xlsx)",
-                            data=processed_data,
+                            data=output,
                             file_name='rekap_cabang_traffic.xlsx',
                             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                         )
@@ -267,18 +266,19 @@ with tab2:
 
             # Export structured_df ke file Excel
             output_structured = io.BytesIO()
-            with pd.ExcelWriter(output_structured, engine='xlsxwriter') as writer:
+            with pd.ExcelWriter(output_structured, engine='openpyxl') as writer:
                 structured_df.to_excel(writer, index=False, sheet_name='Structured Pivot')
-                writer.save()
-                processed_structured_data = output_structured.getvalue()
+            output_structured.seek(0)  # Penting
+
 
             # Tombol download
             st.download_button(
                 label="📥 Download Pivot Table (Device → Interface) (.xlsx)",
-                data=processed_structured_data,
+                data=output_structured,
                 file_name='pivot_table_device_interface.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
+
 
         else:
             st.warning("Tidak ada data yang berhasil digabungkan.")
