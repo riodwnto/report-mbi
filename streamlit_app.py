@@ -32,13 +32,14 @@ with tab1:
 
                 if {'Device Name', 'Total Utilization(%)', 'Interface Name'}.issubset(df.columns):
                     df_filtered = df[['Device Name', 'Total Utilization(%)', 'Interface Name']].copy()
-                    df_filtered.dropna(subset=['Device Name'], inplace=True)
-                    df_filtered = df_filtered[df_filtered['Device Name'].astype(str).str.startswith("RTR")]
-                    # 🚀 Tambahkan di sini untuk mengganti nama interface
+
+                    # 🟩 Tambahan ganti nama Interface Name
                     df_filtered['Interface Name'] = df_filtered['Interface Name'].replace({
                         "GigabitEthernet0/0/1-Gi0/0/1": "GigabitEthernet0/0/1-= WAN INTERNET LA =",
                         "GigabitEthernet0/0/0-Gi0/0/0": "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="
                     })
+                    df_filtered.dropna(subset=['Device Name'], inplace=True)
+                    df_filtered = df_filtered[df_filtered['Device Name'].astype(str).str.startswith("RTR")]
                     df_filtered["Source File"] = uploaded_file.name
                     combined_data.append(df_filtered)
                 else:
@@ -84,6 +85,21 @@ with tab1:
 
             structured_df = pd.DataFrame(structured_data)
             st.dataframe(structured_df, use_container_width=True)
+            
+            # Buat file Excel dari structured_df
+            output_pivot = io.BytesIO()
+            with pd.ExcelWriter(output_pivot, engine='openpyxl') as writer:
+                structured_df.to_excel(writer, index=False, sheet_name='Pivot Table (Average)')
+            output_pivot.seek(0)
+
+            # Tombol download
+            st.download_button(
+                label="📥 Download Pivot Table (Average) (.xlsx)",
+                data=output_pivot,
+                file_name='pivot_table_average.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+)
+
 
         else:
             st.warning("Tidak ada data yang berhasil digabungkan.")
