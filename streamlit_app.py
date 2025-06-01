@@ -34,6 +34,11 @@ with tab1:
                     df_filtered = df[['Device Name', 'Total Utilization(%)', 'Interface Name']].copy()
                     df_filtered.dropna(subset=['Device Name'], inplace=True)
                     df_filtered = df_filtered[df_filtered['Device Name'].astype(str).str.startswith("RTR")]
+                    # 🚀 Tambahkan di sini untuk mengganti nama interface
+                    df_filtered['Interface Name'] = df_filtered['Interface Name'].replace({
+                        "GigabitEthernet0/0/1-Gi0/0/1": "GigabitEthernet0/0/1-= WAN INTERNET LA =",
+                        "GigabitEthernet0/0/0-Gi0/0/0": "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="
+                    })
                     df_filtered["Source File"] = uploaded_file.name
                     combined_data.append(df_filtered)
                 else:
@@ -59,17 +64,6 @@ with tab1:
             st.write("📌 Pivot Table Struktur Device → Interface:")
 
             pivot_df_reset = pivot_df_sorted.reset_index()
-            
-            # Ubah nama Interface Name sesuai kebutuhan
-            pivot_df_reset["Interface Name"] = pivot_df_reset["Interface Name"].replace({
-                "GigabitEthernet0/0/1-Gi0/0/1": "GigabitEthernet0/0/1-= WAN INTERNET LA =",
-                "GigabitEthernet0/0/0-Gi0/0/0": "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="
-            })
-
-            # Filter berdasarkan nama interface masing-masing provider
-            telkom_df = pivot_df_reset[pivot_df_reset['Interface Name'] == "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="]
-            lintasarta_df = pivot_df_reset[pivot_df_reset['Interface Name'] == "GigabitEthernet0/0/1-= WAN INTERNET LA ="]
-
             structured_data = []
 
             for device in pivot_df_reset['Device Name'].unique():
