@@ -217,89 +217,124 @@ with tab1:
 
 # -------------------------- TAB MONTHLY --------------------------
 with tab2:
-    st.header("📊 Monthly Report")
+    st.header("📊 Weekly Report Old")
 
-    uploaded_files_monthly = st.file_uploader(
-        "Upload file Excel (Advanced Report) - Monthly",
-        type=["xlsx"], accept_multiple_files=True, key="monthly_upload"
-    )
+uploaded_files_weekly = st.file_uploader(
+    "Upload file Excel (Advanced Report) - Weekly",
+    type=["xlsx"], accept_multiple_files=True, key="weekly_uploadv2"
+)
 
-    if uploaded_files_monthly:
-        st.subheader("📁 Daftar File Advanced Report yang Diupload:")
-        for uploaded_file in uploaded_files_monthly:
-            st.write(f"- {uploaded_file.name}")
+final_df = None
+structured_df = None
 
-        combined_data = []
+if uploaded_files_weekly:
+    st.subheader("📁 Daftar File Advanced Report yang Diupload:")
+    for uploaded_file in uploaded_files_weekly:
+        st.write(f"- {uploaded_file.name}")
 
-        for uploaded_file in uploaded_files_monthly:
-            try:
-                df = pd.read_excel(uploaded_file, sheet_name="Advanced Report", skiprows=8)
+    combined_data = []
 
+    for uploaded_file in uploaded_files_weekly:
+        try:
+            # Baca hanya beberapa baris pertama untuk menemukan header
+            # Jika 'Advanced Report' adalah nama sheet yang pasti, bisa langsung pakai itu.
+            # Jika tidak, bisa baca tanpa sheet_name dan iterasi sheet.
+            temp_df = pd.read_excel(uploaded_file, sheet_name="Advanced Report", header=None, nrows=15) # Baca 15 baris pertama
+
+            # Cari baris yang berisi semua nama kolom yang kita cari
+            header_row = -1
+            required_columns = {'Device Name', 'Total Utilization(%)', 'Interface Name'}
+
+            for idx, row in temp_df.iterrows():
+                # Pastikan semua kolom yang diperlukan ada di baris ini (mengabaikan case dan spasi tambahan)
+                # Convert semua nilai di baris menjadi string dan ubah ke lowercase untuk pencarian
+                row_values_lower = {str(col).strip().lower() for col in row.dropna().values}
+                
+                # Cek apakah semua kolom yang diperlukan (dalam lowercase) ada di baris ini
+                if all(col.lower() in row_values_lower for col in required_columns):
+                    header_row = idx
+                    break
+            
+            if header_row != -1:
+                # skiprows adalah jumlah baris yang harus dilewati SEBELUM header
+                # Jadi, jika header ditemukan di index 'idx', kita perlu melewati 'idx' baris
+                skip_rows_auto = header_row 
+                
+                # Sekarang, baca ulang file dengan skiprows yang ditemukan dan header di baris pertama data
+                df = pd.read_excel(uploaded_file, sheet_name="Advanced Report", skiprows=skip_rows_auto)
+                
+                # Periksa kembali apakah kolom sudah benar setelah membaca dengan skiprows otomatis
                 if {'Device Name', 'Total Utilization(%)', 'Interface Name'}.issubset(df.columns):
                     df_filtered = df[['Device Name', 'Total Utilization(%)', 'Interface Name']].copy()
+
+                    # 🟩 Tambahan ganti nama Interface Name
+                    df_filtered['Interface Name'] = df_filtered['Interface Name'].replace({
+                        "GigabitEthernet0/0/1-Gi0/0/1": "GigabitEthernet0/0/1-= WAN INTERNET LA =",
+                        "GigabitEthernet0/0/0-Gi0/0/0": "GigabitEthernet0/0/0-= WAN MPLS TELKOM ="
+                    })
                     df_filtered.dropna(subset=['Device Name'], inplace=True)
                     df_filtered = df_filtered[df_filtered['Device Name'].astype(str).str.startswith("RTR")]
                     df_filtered["Source File"] = uploaded_file.name
                     combined_data.append(df_filtered)
                 else:
-                    st.warning(f"Kolom tidak lengkap di file: {uploaded_file.name}")
-            except Exception as e:
-                st.error(f"❌ Gagal memproses file {uploaded_file.name}: {str(e)}")
+                    st.warning(f"Kolom yang diperlukan tidak ditemukan di file: {uploaded_file.name} setelah deteksi header otomatis. Pastikan nama kolom 'Device Name', 'Total Utilization(%)', dan 'Interface Name' sudah benar.")
+            else:
+                st.warning(f"Header kolom tidak ditemukan secara otomatis di file: {uploaded_file.name}. Pastikan file memiliki kolom 'Device Name', 'Total Utilization(%)', dan 'Interface Name'.")
 
-        if combined_data:
-            final_df = pd.concat(combined_data, ignore_index=True)
-            st.subheader("📄 Data Gabungan (Device diawali 'RTR'):")
-            st.dataframe(final_df, use_container_width=True)
+        except Exception as e:
+            st.error(f"❌ Gagal memproses file {uploaded_file.name}: {str(e)}")
 
-            st.subheader("📊 Pivot Table (Average)")
+    if combined_data:
+        final_df = pd.concat(combined_data, ignore_index=True)
+        st.subheader("📄 Data Gabungan (Device diawali 'RTR'):")
+        st.dataframe(final_df, use_container_width=True)
 
-            pivot_df = final_df.pivot_table(
-                index=['Device Name', 'Interface Name'],
-                values='Total Utilization(%)',
-                aggfunc='mean'
-            )
+        st.subheader("📊 Pivot Table (Average)")
 
-            pivot_df_sorted = pivot_df.sort_values(by='Total Utilization(%)', ascending=False)
+        pivot_df = final_df.pivot_table(
+            index=['Device Name', 'Interface Name'],
+            values='Total Utilization(%)',
+            aggfunc='mean'
+        )
 
-            st.write("📌 Pivot Table Struktur Device → Interface:")
+        pivot_df_sorted = pivot_df.sort_values(by='Total Utilization(%)', ascending=False)
 
-            pivot_df_reset = pivot_df_sorted.reset_index()
-            structured_data = []
+        st.write("📌 Pivot Table Struktur Device → Interface:")
 
-            for device in pivot_df_reset['Device Name'].unique():
-                sub_df = pivot_df_reset[pivot_df_reset['Device Name'] == device]
+        pivot_df_reset = pivot_df_sorted.reset_index()
+        structured_data = []
 
+        for device in pivot_df_reset['Device Name'].unique():
+            sub_df = pivot_df_reset[pivot_df_reset['Device Name'] == device]
+
+            structured_data.append({
+                "Device Name": device,
+                "Interface Name": "",
+                "Total Utilization(%)": round(sub_df['Total Utilization(%)'].max(), 2)
+            })
+
+            for _, row in sub_df.iterrows():
                 structured_data.append({
-                    "Device Name": device,
-                    "Interface Name": "",
-                    "Total Utilization(%)": round(sub_df['Total Utilization(%)'].max(), 2)
+                    "Device Name": "",
+                    "Interface Name": row['Interface Name'],
+                    "Total Utilization(%)": round(row['Total Utilization(%)'], 2)
                 })
 
-                for _, row in sub_df.iterrows():
-                    structured_data.append({
-                        "Device Name": "",
-                        "Interface Name": row['Interface Name'],
-                        "Total Utilization(%)": round(row['Total Utilization(%)'], 2)
-                    })
+        structured_df = pd.DataFrame(structured_data)
+        st.dataframe(structured_df, use_container_width=True)
+        
+        # Buat file Excel dari structured_df
+        output_pivot = io.BytesIO()
+        with pd.ExcelWriter(output_pivot, engine='openpyxl') as writer:
+            structured_df.to_excel(writer, index=False, sheet_name='Pivot Table (Average)')
+        output_pivot.seek(0)
 
-            structured_df = pd.DataFrame(structured_data)
-            st.dataframe(structured_df, use_container_width=True)
-
-            # Export structured_df ke file Excel
-            output_structured = io.BytesIO()
-            with pd.ExcelWriter(output_structured, engine='openpyxl') as writer:
-                structured_df.to_excel(writer, index=False, sheet_name='Structured Pivot')
-            output_structured.seek(0)  # Penting
-
-
-            # Tombol download
-            st.download_button(
-                label="📥 Download Pivot Table (Device → Interface) (.xlsx)",
-                data=output_structured,
-                file_name='pivot_table_device_interface.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-
-
-        else:
-            st.warning("Tidak ada data yang berhasil digabungkan.")
+        # Tombol download
+        st.download_button(
+            label="📥 Download Pivot Table (Average) (.xlsx)",
+            data=output_pivot,
+            file_name='pivot_table_average.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    else:
+        st.warning("Tidak ada data yang berhasil digabungkan.")
